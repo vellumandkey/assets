@@ -2,7 +2,7 @@
 # Usage: bash tools/setup_fonts.sh <out_dir>
 # Fetches Playfair Display and Montserrat (SIL OFL) from npm and converts WOFF to TTF.
 set -euo pipefail
-OUT="${1:-fonts}"; mkdir -p "$OUT"; TMP="$(mktemp -d)"
+OUT="${1:-fonts}"; mkdir -p "$OUT"; OUT="$(cd "$OUT" && pwd)"; TMP="$(mktemp -d)"
 cd "$TMP"
 npm pack @fontsource/playfair-display@5.1.0 @fontsource/montserrat@5.1.0 >/dev/null 2>&1
 for f in *.tgz; do tar xzf "$f"; mv package "${f%.tgz}"; done
