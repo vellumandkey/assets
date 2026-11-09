@@ -24,6 +24,7 @@ GREEN = HexColor("#2F3B33")
 W, H = A4
 M = 22 * mm
 
+# Template links are the paid product. Fill these in locally only; never commit real links (public repo).
 LINKS = [
     ("Instagram carousel", "10 slides · 1080 × 1440 px", "[TEMPLATE LINK: keep private, never commit]"),
     ("Instagram stories", "4 pages · 1080 × 1920 px", "[TEMPLATE LINK: keep private, never commit]"),
