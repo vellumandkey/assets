@@ -1,7 +1,10 @@
 import sys
 from PIL import Image, ImageDraw, ImageFont
 
+# Usage: python3 mockups.py <fonts_dir> <png_dir> <out_dir> [name_prefix]
+# Writes <out_dir>/<prefix>-01-hero.jpg ... -05-carousel-and-stories.jpg (2000 x 2000).
 FONTS, PNG, OUT = sys.argv[1], sys.argv[2], sys.argv[3]
+PREFIX = sys.argv[4] if len(sys.argv) > 4 else "georgian-suite"
 
 IVORY = (245, 241, 234)
 CHAR = (31, 31, 31)
@@ -31,6 +34,7 @@ def fit(img, w=None, h=None):
         h = round(img.height * w / img.width)
     else:
         w = round(img.width * h / img.height)
+    assert w <= img.width and h <= img.height, f"would enlarge {img.size} to {(w, h)}"
     return img.resize((w, h), Image.LANCZOS)
 
 
@@ -47,6 +51,28 @@ def new(bg=IVORY):
 
 def rule(d, x, y, w=160, colour=GOLD, h=3):
     d.rectangle([x, y, x + w, y + h], fill=colour)
+
+
+SS = 4  # supersampling factor for diagonal lines and dots
+
+
+def aa_layer():
+    return Image.new("RGBA", (S * SS, S * SS), (0, 0, 0, 0))
+
+
+def aa_line(layer, xy, fill, width):
+    ImageDraw.Draw(layer).line([v * SS for v in xy], fill=fill, width=width * SS)
+
+
+def aa_dot(layer, x, y, r, fill):
+    ImageDraw.Draw(layer).ellipse([(x - r) * SS, (y - r) * SS, (x + r) * SS, (y + r) * SS], fill=fill)
+
+
+def aa_flatten(canvas, layer):
+    small = layer.resize((S, S), Image.LANCZOS)
+    base = canvas.convert("RGBA")
+    base.alpha_composite(small)
+    return base.convert("RGB")
 
 
 def centre_text(d, y, text, f, fill):
@@ -68,7 +94,7 @@ d.text((160, 1690), "Year-in-review templates for estate agents", font=MONL(46),
 d.text((160, 1760), "18 editable Canva designs  ·  carousel, stories and A4 client letter",
        font=MONL(34), fill=STONE_DK)
 d.text((160, 120), "V E L L U M   &   K E Y", font=MON(28), fill=STONE_DK)
-im.save(f"{OUT}/01-hero.jpg", quality=92)
+im.save(f"{OUT}/{PREFIX}-01-hero.jpg", quality=92)
 
 # ---------- M2 Client letter spread ----------
 im, d = new()
@@ -88,7 +114,7 @@ place(im, p1, 200, 1660)
 place(im, p4, 200 + p1.width + 30, 1660)
 d.text((200 + 2 * p1.width + 90, 1760), "Cover letter and outlook pages included",
        font=PLAYI(36), fill=STONE_DK)
-im.save(f"{OUT}/02-client-letter.jpg", quality=92)
+im.save(f"{OUT}/{PREFIX}-02-client-letter.jpg", quality=92)
 
 # ---------- M3 What's included ----------
 im, d = new()
@@ -108,11 +134,11 @@ sw = 180
 for i in range(4):
     t = fit(load("sto", i + 1), w=sw)
     place(im, t, 160 + i * (sw + 25), y0 + 60)
-lw = 215
+lw = (S - 160 - 1030 - 3 * 22) // 4  # keep the letter row inside the right margin
 for i in range(4):
     t = fit(load("let", i + 1), w=lw)
     place(im, t, 1030 + i * (lw + 22), y0 + 60)
-im.save(f"{OUT}/03-whats-included.jpg", quality=92)
+im.save(f"{OUT}/{PREFIX}-03-whats-included.jpg", quality=92)
 
 # ---------- M4 Edit in Canva ----------
 im, d = new()
@@ -124,14 +150,18 @@ place(im, slide, sx, sy)
 callouts = [
     (0.80, 0.14, "Every headline and\nlabel is editable text"),
     (0.78, 0.68, "Chart bars resize to\nyour own figures"),
-    (0.20, 0.955, "Add your agency name\nand details"),
+    (0.20, 0.985, "Add your agency name\nand details"),
 ]
 cx = 1180
-cy_list = [380, 900, 1380]
+cy_list = [380, 900, 1400]  # third dot sits just under the footer so its line clears the text
+layer = aa_layer()
 for (fx, fy, text), cy in zip(callouts, cy_list):
     px, py = sx + int(slide.width * fx), sy + int(slide.height * fy)
-    d.line([px, py, cx - 30, cy + 40], fill=STONE_DK, width=3)
-    d.ellipse([px - 9, py - 9, px + 9, py + 9], fill=GOLD)
+    aa_line(layer, [px, py, cx - 30, cy + 40], STONE_DK + (255,), 3)
+    aa_dot(layer, px, py, 9, GOLD + (255,))
+im = aa_flatten(im, layer)
+d = ImageDraw.Draw(im)
+for (fx, fy, text), cy in zip(callouts, cy_list):
     d.multiline_text((cx, cy), text, font=MONL(44), fill=CHAR, spacing=14)
 steps = [("01", "Open the links\nin your PDF"), ("02", "Replace photos,\ntext and figures"),
          ("03", "Download and\nshare or print")]
@@ -141,7 +171,7 @@ for i, (n, t) in enumerate(steps):
     d.multiline_text((x + 120, 1545), t, font=MONL(36), fill=CHAR, spacing=10)
 centre_text(d, 1840, "Free Canva fonts and elements only  ·  instant download",
             MONL(32), STONE_DK)
-im.save(f"{OUT}/04-edit-in-canva.jpg", quality=92)
+im.save(f"{OUT}/{PREFIX}-04-edit-in-canva.jpg", quality=92)
 
 # ---------- M5 Carousel and stories (deep green) ----------
 im, d = new(GREEN)
@@ -156,10 +186,10 @@ for i, n in enumerate(picks):
     place(im, t, x, y, edge=GREEN)
 st = fit(load("sto", 4), h=940)
 place(im, st, S - 160 - st.width, 320, edge=GREEN)
-d.text((160, 1590), "Ten slides that walk clients through your market’s year,",
+d.text((160, 1360), "Ten slides that walk clients through your market’s year,",
        font=MONL(40), fill=IVORY)
-d.text((160, 1650), "with matching stories to send them to the full review.",
+d.text((160, 1420), "with matching stories to send them to the full review.",
        font=MONL(40), fill=IVORY)
 d.text((160, 1800), "V E L L U M   &   K E Y", font=MON(28), fill=STONE)
-im.save(f"{OUT}/05-carousel-and-stories.jpg", quality=92)
+im.save(f"{OUT}/{PREFIX}-05-carousel-and-stories.jpg", quality=92)
 print("done")

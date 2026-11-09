@@ -3,12 +3,15 @@
 Usage: python3 social_georgian.py <fonts_dir> <png_dir> <assets_root>
 
 <png_dir> holds Canva PNG exports of the Georgian Suite designs:
-  car/1..10.png  carousel (1080 x 1440)      design DAHY8aui-Ik
-  sto/1..4.png   stories (1080 x 1920)        design DAHY8SInyzE
-  let/1..4.png   A4 letter (1240 x 1754)      design DAHZO8HSPyc
-  hi/car1.png (2160 w), hi/sto1.png (2160 w), hi/let1.png (3508 w)
-                 high-resolution exports of the pages whose photographs are cropped
-Writes <assets_root>/pins/georgian-suite-pin-02..10.jpg (1000 x 1500)
+  car/1..10.png  carousel (1080 x 1440 or 2x)
+  sto/1..4.png   stories (1080 x 1920 or 2x)
+  let/1..4.png   A4 letter (1240 x 1754 or 2x)
+  photos/terrace.png, photos/door.png, photos/hallway.png
+                 the placeholder photographs at their native size (as generated in
+                 Canva, before placement), so crops are never taken from an
+                 upscaled page export. Any page width works for car/sto/let:
+                 pages are only ever scaled down.
+Writes <assets_root>/pins/georgian-suite-pin-01..10.jpg (1000 x 1500)
 and <assets_root>/instagram/georgian-suite-ig-0N-0M.jpg (1080 x 1350).
 Helpers follow tools/mockups.py.
 """
@@ -40,15 +43,12 @@ def load(kind, n):
     return Image.open(f"{PNG}/{kind}/{n}.png").convert("RGB")
 
 
-def load_hi(name):
-    return Image.open(f"{PNG}/hi/{name}.png").convert("RGB")
-
-
 def fit(img, w=None, h=None):
     if w:
         h = round(img.height * w / img.width)
     else:
         w = round(img.width * h / img.height)
+    assert w <= img.width and h <= img.height, f"would enlarge {img.size} to {(w, h)}"
     return img.resize((w, h), Image.LANCZOS)
 
 
@@ -63,25 +63,22 @@ def rule(d, x, y, w=120, colour=GOLD, h=3):
     d.rectangle([x, y, x + w, y + h], fill=colour)
 
 
-# --- photographs cropped from the Canva designs (boxes in hi-res export px) ---
-PHOTO_BOX = {
-    "terrace": ("car1", (0, 0, 2160, 1648)),     # carousel slide 1
-    "door": ("sto1", (0, 0, 2160, 2072)),        # story 1
-    "hallway": ("let1", (212, 373, 3300, 2260)), # letter page 1
-}
+# --- placeholder photographs at native size (same images as placed in the designs) ---
+# terrace: carousel slide 1 (1456 x 1088); door: story 1 (1264 x 1264);
+# hallway: letter page 1 (1536 x 1024)
 _photo_cache = {}
 
 
 def photo(name):
     if name not in _photo_cache:
-        src, box = PHOTO_BOX[name]
-        _photo_cache[name] = load_hi(src).crop(box)
+        _photo_cache[name] = Image.open(f"{PNG}/photos/{name}.png").convert("RGB")
     return _photo_cache[name]
 
 
 def cover(img, w, h, fx=0.5, fy=0.5):
     """Scale-and-crop img to exactly w x h; fx/fy pick the focal point (0-1)."""
     s = max(w / img.width, h / img.height)
+    assert s <= 1.0, f"would enlarge {img.size} by {s:.3f} to fill {w} x {h}"
     rw, rh = round(img.width * s), round(img.height * s)
     r = img.resize((rw, rh), Image.LANCZOS)
     x = round((rw - w) * fx)
@@ -167,7 +164,20 @@ def photo_pin(n, name, head, sub, fx=0.5, fy=0.5, ph=840):
     save(im, PIN % n)
 
 
-# pin 02 - black front door
+# pin 01 - letter, carousel cover and story cover above the product line
+# (rebuilt here so it shows the current placeholder photographs)
+im, d = pin_canvas()
+bottom = trio(im, M + 30, 175, PW - 2 * M - 60)
+y = text_block(d, M, bottom + 60, "Year-in-review templates for estate agents",
+               PLAY(88), CHAR, 640, 98)
+rule(d, M, y + 26)
+d.text((M, y + 62), "Instagram carousel, stories and an A4 client letter.", font=MONL(32), fill=CHAR)
+d.text((M, y + 108), "Editable in Canva.", font=MONL(32), fill=CHAR)
+assert y + 108 + 40 < 1390, "pin 01 text runs into the footer"
+pin_footer(d)
+save(im, PIN % 1)
+
+# pin 02 - deep green front door
 photo_pin(2, "door", "Close the year with your clients.",
           "Year-in-review templates for estate agents.", fy=0.35)
 
@@ -287,9 +297,9 @@ def refit_page(img, bg, label, h=1080):
     return im
 
 
-def photo_slide(name, fx=0.5, fy=0.5, ph=1090):
-    """Photograph across the top with an ivory band. Kept to ~1090 px tall because the
-    Canva source photos are only ~1000 px native; full-bleed 1350 px tall looked soft."""
+def photo_slide(name, fx=0.5, fy=0.5, ph=1020):
+    """Photograph across the top with an ivory band. Kept to 1020 px tall because the
+    source photos are 1024-1264 px native and must not be enlarged."""
     im, d = ig_canvas()
     im.paste(cover(photo(name), IW, ph, fx, fy), (0, 0))
     d.text((IM, ph + 92), "The Georgian Suite", font=PLAYI(34), fill=STONE_DK)
